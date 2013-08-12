@@ -1,0 +1,3 @@
+deps/
+ebin/
+c_src/*.o
