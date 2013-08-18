@@ -10,7 +10,8 @@
 -export([hmac_sha512/2]).
 
 %ecdsa functions
--export([ecdsa_generate_private_key/2, ecdsa_generate_private_key/1]).
+-export([ecdsa_generate_public_key/2, ecdsa_generate_private_key/1]).
+-export([ecdsa_get_modulus/1, ecdsa_point_addition/3]).
 
 -compile([export_all]).
 
@@ -74,7 +75,7 @@ ripemd160(B) ->
 ripemd256(B) ->
 	ripemd(ripemd256, B).
 ripemd320(B) ->
-	ripemd(ripemd320, B).
+	ripemd(risecp256r1pemd320, B).
 
 tiger(B) when is_binary(B) ->
 	nif_hash_tiger(B).
@@ -96,31 +97,31 @@ hmac_sha512(Key, Data) when is_binary(Key) and is_binary(Data) ->
 	nif_hmac_sha512(Key, Data).
 
 %% ECDSA Functions
-ecdsa_generate_private_key(secp112r1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp112r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp112r1, B);
-ecdsa_generate_private_key(secp160r1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp160ecdsa_point_additionr1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp160r1, B);
-ecdsa_generate_private_key(secp160k1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp160k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp160k1, B);
-ecdsa_generate_private_key(secp256k1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp256k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp256k1, B);
-ecdsa_generate_private_key(secp128r1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp128r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp128r1, B);
-ecdsa_generate_private_key(secp128r2, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp128r2, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp128r2, B);
-ecdsa_generate_private_key(secp160r2, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp160r2, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp160r2, B);
-ecdsa_generate_private_key(secp192k1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp192k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp192k1, B);
-ecdsa_generate_private_key(secp224k1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp224k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp224k1, B);
-ecdsa_generate_private_key(secp224r1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp224r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(sec224r1, B);
-ecdsa_generate_private_key(secp384r1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp384r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp384r1, B);
-ecdsa_generate_private_key(secp521r1, B) when is_binary(B) ->
+ecdsa_generate_public_key(secp521r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp521r1, B);
-ecdsa_generate_private_key(Curve, B) when is_binary(B) ->
+ecdsa_generate_public_key(Curve, B) when is_binary(B) ->
 	{error, {unknown_ec_curve, Curve}}.
 
 ecdsa_generate_private_key(secp112r1) ->
@@ -150,12 +151,31 @@ ecdsa_generate_private_key(secp521r1) ->
 ecdsa_generate_private_key(Curve) ->
 	{error, {unknown_ec_curve, Curve}}.
 
+ecdsa_get_modulus(Curve) when is_atom(Curve) ->
+	Mod = nif_ecdsa_get_modulus(Curve),
+	binary:decode_unsigned(Mod).
+
+ecdsa_point_addition(Curve, Point1, Point2) ->
+	nif_ecdsa_point_addition(Curve, Point1, Point2).
+
 %Decode a uncompressed key so that it is in point form to be sent to the
 % verification functions.
-ecdsa_decode_public_key(PublicKey) when is_binary(PublicKey) ->
-	KeySize = (byte_size(PublicKey)-1)/2,
-	<<4, X:KeySize/binary, Y:KeySize/binary>> = PublicKey,
+ecdsa_decode_public_key(UncompressedKey) when is_binary(UncompressedKey) ->
+	KeySize = (byte_size(UncompressedKey)-1) div 2,
+	<<4, X:KeySize/binary, Y:KeySize/binary>> = UncompressedKey,
 	{X, Y}.
+
+ecdsa_encode_public_key({X, Y}) ->
+	<<4, X/binary, Y/binary>>.
+
+%%Encode the point as in compressed SEC form
+ecdsa_compress_key(UncompressedKey) when is_binary(UncompressedKey) ->
+	{X, Y} = ecdsa_decode_public_key(UncompressedKey),
+	Parity = case (binary:decode_unsigned(Y) rem 2) of
+			0 -> 2;
+			1 -> 3
+		 end,
+	<<Parity, X/binary>>.
 
 init() ->
 	PrivDir = case code:priv_dir(?MODULE) of
@@ -220,6 +240,10 @@ nif_hmac_sha512(_K, _D) ->
 nif_ecdsa_generate_public_key(_Curve, _B) ->
 	?NOT_LOADED.
 nif_ecdsa_generate_private_key(_Curve) ->
+	?NOT_LOADED.
+nif_ecdsa_get_modulus(_Curve) ->
+	?NOT_LOADED.
+nif_ecdsa_point_addition(_Curve, _Point1, _Point2) ->
 	?NOT_LOADED.
 
 hex_dump(Number) ->

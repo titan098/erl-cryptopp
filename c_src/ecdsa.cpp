@@ -70,7 +70,6 @@ ERL_NIF_TERM ecdsa_generate_public_key(ErlNifEnv* env, int argc, const ERL_NIF_T
 	//generate the private key.
 	ErlNifBinary privKey;
 	char ec_curve[32];
-	memset(ec_curve, 0x00, sizeof(ec_curve));
 	ERL_NIF_TERM out;
 	
 	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
@@ -135,4 +134,101 @@ ERL_NIF_TERM ecdsa_generate_private_key(ErlNifEnv* env, int argc, const ERL_NIF_
 	keyOutput.Get(privateKeyBuffer, keyOutput.MaxRetrievable());
 
 	return out;
+}
+
+ERL_NIF_TERM ecdsa_get_modulus(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+	//get the cruve name
+	char ec_curve[32];
+	ERL_NIF_TERM out;
+
+	memset(ec_curve, 0x00, sizeof(ec_curve));
+
+	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
+		return enif_make_badarg(env);
+	}
+
+	//get the domain parameters
+	DL_GroupParameters_EC<ECP> params = getECCurve(ec_curve);
+	const Integer& n = params.GetCurve().GetField().GetModulus();
+
+	//get the private key
+	ByteQueue modOut;
+	
+	n.Encode(modOut, n.ByteCount());
+
+	//copy out the private key
+	byte* buffer = (byte*)enif_make_new_binary(env, modOut.MaxRetrievable(), &out);
+	modOut.Get(buffer, modOut.MaxRetrievable());
+
+	return out;
+}
+
+ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+	//add points together in the finite field
+	char ec_curve[32];
+	int arity1;	//arity of each of the tuples
+	int arity2;
+	const ERL_NIF_TERM* point1;
+	const ERL_NIF_TERM* point2;
+
+	//out binaries
+	ERL_NIF_TERM outX;
+	ERL_NIF_TERM outY;
+
+	//out tuple
+	ERL_NIF_TERM outTuple;
+
+	memset(ec_curve, 0x00, sizeof(ec_curve));
+
+	//param1 - curve name
+	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
+		return enif_make_badarg(env);
+	}
+
+	//point 1
+	if (!enif_get_tuple(env, argv[1], &arity1, &point1)) {
+		return enif_make_badarg(env);
+	}
+
+	//point 2
+	if (!enif_get_tuple(env, argv[2], &arity2, &point2)) {
+		return enif_make_badarg(env);
+	}
+
+	//the points should be expressed as binaries to help marshal it to this function
+	//these should be converted to Integers (cryptoPP)
+	ErlNifBinary p1[2];
+	ErlNifBinary p2[2];
+
+	for (int i = 0; i < arity1; i++) {
+		enif_inspect_binary(env, point1[i], &(p1[i]));
+		enif_inspect_binary(env, point1[i], &(p2[i]));
+	}
+	
+	Integer x1(p1[0].data, p1[0].size);
+	Integer y1(p1[0].data, p1[0].size);
+	Integer x2(p1[1].data, p1[1].size);
+	Integer y2(p1[1].data, p1[1].size);
+
+	ECP::Point pnt1(x1, y1);
+	ECP::Point pnt2(x2, y2);
+
+	//get the domain parameters
+	DL_GroupParameters_EC<ECP> params = getECCurve(ec_curve);
+	const Integer& n = params.GetCurve().GetField().GetModulus();
+	const Integer& a = params.GetCurve().GetA();
+	const Integer& b = params.GetCurve().GetB();
+
+	//add the points together in the field
+	ECP pointAdder(n, a, b);
+	const ECP::Point& newPnt = pointAdder.Add(pnt1, pnt2);
+
+	//now marshall the points back to binaries
+	byte* outXbuffer = (byte*)enif_make_new_binary(env, newPnt.x.ByteCount(), &outX);
+	newPnt.x.Encode(outXbuffer, newPnt.x.ByteCount());
+
+	byte* outYbuffer = (byte*)enif_make_new_binary(env, newPnt.y.ByteCount(), &outY);
+	newPnt.y.Encode(outYbuffer, newPnt.y.ByteCount());
+
+	return enif_make_tuple(env, 2, outX, outY);
 }
