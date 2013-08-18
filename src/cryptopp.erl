@@ -10,7 +10,7 @@
 -export([hmac_sha512/2]).
 
 %ecdsa functions
--export([ecdsa_generate_key/2]).
+-export([ecdsa_generate_private_key/2, ecdsa_generate_private_key/1]).
 
 -compile([export_all]).
 
@@ -96,31 +96,58 @@ hmac_sha512(Key, Data) when is_binary(Key) and is_binary(Data) ->
 	nif_hmac_sha512(Key, Data).
 
 %% ECDSA Functions
-ecdsa_generate_key(secp112r1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp112r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp112r1, B);
-ecdsa_generate_key(secp160r1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp160r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp160r1, B);
-ecdsa_generate_key(secp160k1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp160k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp160k1, B);
-ecdsa_generate_key(secp256k1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp256k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp256k1, B);
-ecdsa_generate_key(secp128r1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp128r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp128r1, B);
-ecdsa_generate_key(secp128r2, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp128r2, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp128r2, B);
-ecdsa_generate_key(secp160r2, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp160r2, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp160r2, B);
-ecdsa_generate_key(secp192k1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp192k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp192k1, B);
-ecdsa_generate_key(secp224k1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp224k1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp224k1, B);
-ecdsa_generate_key(secp224r1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp224r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(sec224r1, B);
-ecdsa_generate_key(secp384r1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp384r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp384r1, B);
-ecdsa_generate_key(secp521r1, B) when is_binary(B) ->
+ecdsa_generate_private_key(secp521r1, B) when is_binary(B) ->
 	nif_ecdsa_generate_public_key(secp521r1, B);
-ecdsa_generate_key(Curve, B) when is_binary(B) ->
+ecdsa_generate_private_key(Curve, B) when is_binary(B) ->
+	{error, {unknown_ec_curve, Curve}}.
+
+ecdsa_generate_private_key(secp112r1) ->
+	nif_ecdsa_generate_private_key(secp112r1);
+ecdsa_generate_private_key(secp160r1) ->
+	nif_ecdsa_generate_private_key(secp160r1);
+ecdsa_generate_private_key(secp160k1) ->
+	nif_ecdsa_generate_private_key(secp160k1);
+ecdsa_generate_private_key(secp256k1) ->
+	nif_ecdsa_generate_private_key(secp256k1);
+ecdsa_generate_private_key(secp128r1) ->
+	nif_ecdsa_generate_private_key(secp128r1);
+ecdsa_generate_private_key(secp128r2) ->
+	nif_ecdsa_generate_private_key(secp128r2);
+ecdsa_generate_private_key(secp160r2) ->
+	nif_ecdsa_generate_private_key(secp160r2);
+ecdsa_generate_private_key(secp192k1) ->
+	nif_ecdsa_generate_private_key(secp192k1);
+ecdsa_generate_private_key(secp224k1) ->
+	nif_ecdsa_generate_private_key(secp224k1);
+ecdsa_generate_private_key(secp224r1) ->
+	nif_ecdsa_generate_private_key(sec224r1);
+ecdsa_generate_private_key(secp384r1) ->
+	nif_ecdsa_generate_private_key(secp384r1);
+ecdsa_generate_private_key(secp521r1) ->
+	nif_ecdsa_generate_private_key(secp521r1);
+ecdsa_generate_private_key(Curve) ->
 	{error, {unknown_ec_curve, Curve}}.
 
 %Decode a uncompressed key so that it is in point form to be sent to the
@@ -191,6 +218,8 @@ nif_hmac_sha512(_K, _D) ->
 	?NOT_LOADED.
 
 nif_ecdsa_generate_public_key(_Curve, _B) ->
+	?NOT_LOADED.
+nif_ecdsa_generate_private_key(_Curve) ->
 	?NOT_LOADED.
 
 hex_dump(Number) ->

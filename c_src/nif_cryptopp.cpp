@@ -25,6 +25,7 @@ static ErlNifFunc nif_funcs[] = {
 	{"nif_hmac_sha512",	2, hmac_sha512},
 
 	{"nif_ecdsa_generate_public_key", 2, ecdsa_generate_public_key},
+	{"nif_ecdsa_generate_private_key", 1, ecdsa_generate_private_key},
 };
 
 ERL_NIF_INIT(cryptopp, nif_funcs, NULL, NULL, NULL, NULL)
