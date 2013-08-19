@@ -149,7 +149,7 @@ ERL_NIF_TERM ecdsa_get_modulus(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
 
 	//get the domain parameters
 	DL_GroupParameters_EC<ECP> params = getECCurve(ec_curve);
-	const Integer& n = params.GetCurve().GetField().GetModulus();
+	const Integer& n = params.GetSubgroupOrder();
 
 	//get the private key
 	ByteQueue modOut;
