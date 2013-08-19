@@ -65,6 +65,20 @@ void initializePrivateKey(char* ec_curve, ECDSA<ECP, SHA256>::PrivateKey& Privat
 	PrivateKey.Initialize(prng, getECCurve(ec_curve));
 }
 
+//get the byte size of the modulus as a reasonable estimate for padding points.
+int get_point_size(char* ec_curve) {
+	DL_GroupParameters_EC<ECP> params = getECCurve(ec_curve);
+	return params.GetSubgroupOrder().ByteCount();
+}
+
+//a simple function to place some extra padding on the queue if needed
+void putpadding(ByteQueue& queue, int count) {
+	if (count <= 0)
+		return;
+	queue.Put(0);
+	putpadding(queue, count--);
+}
+
 ERL_NIF_TERM ecdsa_generate_public_key(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 	//this will contain the private key that will be used to initilise and
 	//generate the private key.
@@ -98,13 +112,24 @@ ERL_NIF_TERM ecdsa_generate_public_key(ErlNifEnv* env, int argc, const ERL_NIF_T
 	ByteQueue keyOutput;
 	
 	//output an uncompressed SEC private key
+	int PointSize = get_point_size(ec_curve);
 	keyOutput.Put(4);
-	px.Encode(keyOutput, px.ByteCount());
-	py.Encode(keyOutput, py.ByteCount());
+	
+	//a holding buffer for the output points
+	byte xBuffer[PointSize];
+	byte yBuffer[PointSize];
+	memset(xBuffer, 0, sizeof(xBuffer));
+	memset(yBuffer, 0, sizeof(yBuffer));
+	
+	px.Encode(xBuffer+(PointSize-px.ByteCount()), px.ByteCount());
+	py.Encode(yBuffer+(PointSize-py.ByteCount()), py.ByteCount());
+
+	keyOutput.Put(xBuffer, sizeof(xBuffer));
+	keyOutput.Put(yBuffer, sizeof(yBuffer));
 
 	//copy the output to the term
-	byte* publiKeyBuffer = (byte*)enif_make_new_binary(env, keyOutput.MaxRetrievable(), &out);
-	keyOutput.Get(publiKeyBuffer, keyOutput.MaxRetrievable());
+	byte* publicKeyBuffer = (byte*)enif_make_new_binary(env, keyOutput.MaxRetrievable(), &out);
+	keyOutput.Get(publicKeyBuffer, keyOutput.MaxRetrievable());
 	
 	return out;
 }
@@ -174,9 +199,6 @@ ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
 	//out binaries
 	ERL_NIF_TERM outX;
 	ERL_NIF_TERM outY;
-
-	//out tuple
-	ERL_NIF_TERM outTuple;
 
 	memset(ec_curve, 0x00, sizeof(ec_curve));
 
