@@ -28,6 +28,9 @@ static ErlNifFunc nif_funcs[] = {
 	{"nif_ecdsa_generate_private_key", 1, ecdsa_generate_private_key},
 	{"nif_ecdsa_get_modulus", 1, ecdsa_get_modulus},
 	{"nif_ecdsa_point_addition", 3, ecdsa_point_addition},
+
+	{"nif_ecdsa_sign", 3, ecdsa_sign},
+	{"nif_ecdsa_verify", 4, ecdsa_verify}
 };
 
 ERL_NIF_INIT(cryptopp, nif_funcs, NULL, NULL, NULL, NULL)

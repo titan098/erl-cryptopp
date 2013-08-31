@@ -56,11 +56,11 @@ DL_GroupParameters_EC<ECP> getECCurve(char* ec_curve) {
 	return ASN1::secp256k1();	//default use this key to prevent a crash
 }
 
-void initializePrivateKey(char* ec_curve, ECDSA<ECP, SHA256>::PrivateKey& PrivateKey, const Integer& key) {
+void initializePrivateKey(char* ec_curve, ECDSA<ECP, SHA1>::PrivateKey& PrivateKey, const Integer& key) {
 	PrivateKey.Initialize(getECCurve(ec_curve), key);
 }
 
-void initializePrivateKey(char* ec_curve, ECDSA<ECP, SHA256>::PrivateKey& PrivateKey) {
+void initializePrivateKey(char* ec_curve, ECDSA<ECP, SHA1>::PrivateKey& PrivateKey) {
 	AutoSeededRandomPool prng;
 	PrivateKey.Initialize(prng, getECCurve(ec_curve));
 }
@@ -99,8 +99,8 @@ ERL_NIF_TERM ecdsa_generate_public_key(ErlNifEnv* env, int argc, const ERL_NIF_T
 	Integer key(privKey.data, privKey.size);
 	
 	//generate the private and public key containers
-	ECDSA<ECP, SHA256>::PrivateKey privateKey;
-	ECDSA<ECP, SHA256>::PublicKey publicKey;
+	ECDSA<ECP, SHA1>::PrivateKey privateKey;
+	ECDSA<ECP, SHA1>::PublicKey publicKey;
 
 	initializePrivateKey(ec_curve, privateKey, key);	
 	privateKey.MakePublicKey(publicKey);	//get the corresponding public key
@@ -145,7 +145,7 @@ ERL_NIF_TERM ecdsa_generate_private_key(ErlNifEnv* env, int argc, const ERL_NIF_
 		return enif_make_badarg(env);
 	}
 
-	ECDSA<ECP, SHA256>::PrivateKey privateKey;
+	ECDSA<ECP, SHA1>::PrivateKey privateKey;
 	initializePrivateKey(ec_curve, privateKey);
 
 	//get the private key
@@ -253,4 +253,110 @@ ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
 	newPnt.y.Encode(outYbuffer, newPnt.y.ByteCount());
 
 	return enif_make_tuple(env, 2, outX, outY);
+}
+
+// Sign a message with an ECDSA private key - the message is a binary string
+// Param1 - curve/atom, Param 2 - Private Key/binary, Param 3 - Message/binary
+// Return Signature/binary
+ERL_NIF_TERM ecdsa_sign(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+	ERL_NIF_TERM out;
+	ErlNifBinary privKey;
+	ErlNifBinary message;
+	AutoSeededRandomPool prng;	//used for signing
+	char ec_curve[32];
+
+	//get the data and the signature
+	//param1 - curve name
+	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
+		return enif_make_badarg(env);
+	}
+
+	//param2 - private key
+	if (!enif_inspect_binary(env, argv[1], &privKey)) {
+		return enif_make_badarg(env);
+	}
+
+	//param2 - message
+	if (!enif_inspect_binary(env, argv[2], &message)) {
+		return enif_make_badarg(env);
+	}
+
+	//Populate Private Key
+	ECDSA<ECP, SHA1>::PrivateKey privateKey;
+	Integer key(privKey.data, privKey.size);
+	initializePrivateKey(ec_curve, privateKey, key);
+
+	//create a signer
+	ECDSA<ECP, SHA1>::Signer signer(privateKey);
+	int SignatureLength = signer.MaxSignatureLength();
+	byte signature[SignatureLength];
+	memset(signature, 0x00, SignatureLength);
+
+	//sign the message
+	int sigLength = signer.SignMessage(prng, (const byte*)message.data, message.size, signature);
+	
+	//copy out the signature to the term
+	byte* outBuffer = (byte*)enif_make_new_binary(env, sigLength, &out);
+	memcpy(outBuffer, signature, sigLength);
+	memset(signature, 0x00, SignatureLength);
+	
+	return out;	
+}
+
+// Verify a message with an ECDSA public key - the message is a binary string
+// Param1 - curve/atom, Param 2 - public Key/tuple {X,Y}, Param 3 - Message/binary
+// Param4 - Signature/binary
+// Return true/false
+ERL_NIF_TERM ecdsa_verify(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+	ERL_NIF_TERM out;
+	int pubKeyArity;
+	const ERL_NIF_TERM* pubKey;
+
+	ErlNifBinary pubKeyX;
+	ErlNifBinary pubKeyY;
+
+	ErlNifBinary message;
+	ErlNifBinary signature;
+	char ec_curve[32];
+
+	//get the data and the signature
+	//param1 - curve name
+	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
+		return enif_make_badarg(env);
+	}
+
+	//param2 - public key tuple of {x,y}
+	if (!enif_get_tuple(env, argv[1], &pubKeyArity, &pubKey)) {
+		return enif_make_badarg(env);
+	}
+
+	//param3 - message
+	if (!enif_inspect_binary(env, argv[2], &message)) {
+		return enif_make_badarg(env);
+	}
+
+	//param4 - signature
+	if (!enif_inspect_binary(env, argv[3], &signature)) {
+		return enif_make_badarg(env);
+	}
+
+	//TODO: Check that the arity of the tuple is 2
+	//extract the integer components from the public key
+	enif_inspect_binary(env, pubKey[0], &pubKeyX);
+	enif_inspect_binary(env, pubKey[1], &pubKeyY);
+
+	//Populate Private Key
+	ECDSA<ECP, SHA1>::PublicKey publicKey;
+	ECP::Point q(Integer(pubKeyX.data, pubKeyX.size), Integer(pubKeyY.data, pubKeyY.size));
+	publicKey.Initialize(getECCurve(ec_curve), q);
+
+	//create a signer
+	ECDSA<ECP, SHA1>::Verifier verifier(publicKey);
+
+	//sign the message
+	bool result = verifier.VerifyMessage((const byte*)message.data, message.size, (const byte*)signature.data, signature.size);
+	
+	if (result)
+		return enif_make_atom(env, "true\0");	
+	return enif_make_atom(env, "false\0");
 }

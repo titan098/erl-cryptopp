@@ -12,6 +12,7 @@
 %ecdsa functions
 -export([ecdsa_generate_public_key/2, ecdsa_generate_private_key/1]).
 -export([ecdsa_get_modulus/1, ecdsa_point_addition/3]).
+-export([ecdsa_sign/3, ecdsa_verify/4]).
 
 -compile([export_all]).
 
@@ -177,6 +178,12 @@ ecdsa_compress_key(UncompressedKey) when is_binary(UncompressedKey) ->
 		 end,
 	<<Parity, X/binary>>.
 
+ecdsa_sign(Curve, PrivateKey, Message) ->
+	nif_ecdsa_sign(Curve, PrivateKey, Message).
+
+ecdsa_verify(Curve, PublicKey, Message, Signature) ->
+	nif_ecdsa_verify(Curve, PublicKey, Message, Signature).
+
 init() ->
 	PrivDir = case code:priv_dir(?MODULE) of
 		{error, _} ->
@@ -244,6 +251,12 @@ nif_ecdsa_generate_private_key(_Curve) ->
 nif_ecdsa_get_modulus(_Curve) ->
 	?NOT_LOADED.
 nif_ecdsa_point_addition(_Curve, _Point1, _Point2) ->
+	?NOT_LOADED.
+
+nif_ecdsa_sign(_Curve, _PrivateKey, _Message) ->
+	?NOT_LOADED.
+
+nif_ecdsa_verify(_Curve, _PublicKey, _Message, _Signature) ->
 	?NOT_LOADED.
 
 hex_dump(Number) ->
