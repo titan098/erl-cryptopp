@@ -184,15 +184,18 @@ decodeIEEEP1363(Signature) ->
 	<<R:ByteSize, S:ByteSize, _Rest/binary>> = Signature,
 	{R, S}.
 
+%% Decode a ECDSA-Sig-Value from a passed DER structure
 decodeECDSADer(Signature) when is_binary(Signature) ->
 	case 'EccSignature':decode('ECDSA-Sig-Value', Signature) of 
 		{ok, ECDSASignature} -> ECDSASignature;
 		{error, _Msg} -> {error, could_not_decode_signature}
 	end.
 
+%% Sign a message using a passed private key
 ecdsa_sign(Curve, PrivateKey, Message) ->
 	nif_ecdsa_sign(Curve, PrivateKey, Message).
 
+%% Sign a message using a passed private key and return the result as a DER formatted structure
 ecdsa_sign(Curve, PrivateKey, Message, der) ->
 	{R, S} = decodeIEEEP1363(nif_ecdsa_sign(Curve, PrivateKey, Message)),
 	case 'EccSignature':encode('ECDSA-Sig-Value', {'ECDSA-Sig-Value', R, S}) of
@@ -200,9 +203,11 @@ ecdsa_sign(Curve, PrivateKey, Message, der) ->
 		{error, _Msg} -> {error, could_not_encode_signature}
 	end.
 
+%% Verify a message with a passed public key. ECDSA requires both the message and the signature to verify
 ecdsa_verify(Curve, PublicKey, Message, Signature) ->
 	nif_ecdsa_verify(Curve, PublicKey, Message, Signature).
 
+%% Verify a message using a passed public key. The signature is encoded as a DER structure
 ecdsa_verify(Curve, PublicKey, Message, Signature, der) ->
 	{'ECDSA-Sig-Value', R, S} = decodeECDSADer(Signature),
 	Rbin = binary:encode_unsigned(R),
