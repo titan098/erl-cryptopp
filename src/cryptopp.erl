@@ -14,7 +14,7 @@
 -export([ecdsa_get_modulus/1, ecdsa_point_addition/3]).
 -export([ecdsa_sign/3, ecdsa_verify/4]).
 
--compile([export_all]).
+-compile([export_all, debug_info]).
 
 -define(NOT_LOADED, not_loaded(?LINE)).
 
@@ -178,11 +178,36 @@ ecdsa_compress_key(UncompressedKey) when is_binary(UncompressedKey) ->
 		 end,
 	<<Parity, X/binary>>.
 
+%% Signature verification and Signing functions %%%
+decodeIEEEP1363(Signature) ->
+	ByteSize = (byte_size(Signature)*8) div 2,
+	<<R:ByteSize, S:ByteSize, _Rest/binary>> = Signature,
+	{R, S}.
+
+decodeECDSADer(Signature) when is_binary(Signature) ->
+	case 'EccSignature':decode('ECDSA-Sig-Value', Signature) of 
+		{ok, ECDSASignature} -> ECDSASignature;
+		{error, _Msg} -> {error, could_not_decode_signature}
+	end.
+
 ecdsa_sign(Curve, PrivateKey, Message) ->
 	nif_ecdsa_sign(Curve, PrivateKey, Message).
 
+ecdsa_sign(Curve, PrivateKey, Message, der) ->
+	{R, S} = decodeIEEEP1363(nif_ecdsa_sign(Curve, PrivateKey, Message)),
+	case 'EccSignature':encode('ECDSA-Sig-Value', {'ECDSA-Sig-Value', R, S}) of
+		{ok, Binary} -> Binary;
+		{error, _Msg} -> {error, could_not_encode_signature}
+	end.
+
 ecdsa_verify(Curve, PublicKey, Message, Signature) ->
 	nif_ecdsa_verify(Curve, PublicKey, Message, Signature).
+
+ecdsa_verify(Curve, PublicKey, Message, Signature, der) ->
+	{'ECDSA-Sig-Value', R, S} = decodeECDSADer(Signature),
+	Rbin = binary:encode_unsigned(R),
+	Sbin = binary:encode_unsigned(S),
+	nif_ecdsa_verify(Curve, PublicKey, Message, <<Rbin/binary, Sbin/binary>>).
 
 init() ->
 	PrivDir = case code:priv_dir(?MODULE) of

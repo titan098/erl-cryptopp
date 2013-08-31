@@ -1,0 +1,13 @@
+f().
+M = cryptopp:ecdsa_generate_private_key(secp256k1).
+P = cryptopp:ecdsa_generate_public_key(secp256k1, M).
+Pt = cryptopp:ecdsa_decode_public_key(P).
+Sig = cryptopp:ecdsa_sign(secp256k1, M, <<1,2,3,4,5>>).
+SigDer = cryptopp:ecdsa_sign(secp256k1, M, <<1,2,3,4,5>>, der).
+
+<<R:256, S:256>> = Sig.
+{ok, Bin} = 'EccSignature':encode('ECDSA-Sig-Value', {'ECDSA-Sig-Value', R, S}).
+
+cryptopp:ecdsa_verify(secp256k1, Pt, <<1,2,3,4,5>>, Sig).
+cryptopp:ecdsa_verify(secp256k1, Pt, <<1,2,3,4,5>>, SigDer, der).
+
