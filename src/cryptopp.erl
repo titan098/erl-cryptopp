@@ -11,7 +11,7 @@
 
 %ecdsa functions
 -export([ecdsa_generate_public_key/2, ecdsa_generate_private_key/1]).
--export([ecdsa_get_modulus/1, ecdsa_point_addition/3]).
+-export([ecdsa_get_modulus/1, ecdsa_point_addition/3, ecdsa_compress_point/1, ecdsa_decode_point/2]).
 -export([ecdsa_sign/3, ecdsa_verify/4]).
 
 -compile([export_all, debug_info]).
@@ -170,13 +170,17 @@ ecdsa_encode_public_key({X, Y}) ->
 	<<4, X/binary, Y/binary>>.
 
 %%Encode the point as in compressed SEC form
-ecdsa_compress_key(UncompressedKey) when is_binary(UncompressedKey) ->
-	{X, Y} = ecdsa_decode_public_key(UncompressedKey),
+ecdsa_compress_point(UncompressedPoint) when is_binary(UncompressedPoint) ->
+	{X, Y} = ecdsa_decode_public_key(UncompressedPoint),
 	Parity = case (binary:decode_unsigned(Y) rem 2) of
 			0 -> 2;
 			1 -> 3
 		 end,
 	<<Parity, X/binary>>.
+
+%%Decode a point that is in compressed SEC form
+ecdsa_decode_point(Curve, CompressedPoint) when is_binary(CompressedPoint) ->
+	nif_ecdsa_decode_point(Curve, CompressedPoint).
 
 %% Signature verification and Signing functions %%%
 decodeIEEEP1363(Signature) ->
@@ -281,6 +285,8 @@ nif_ecdsa_generate_private_key(_Curve) ->
 nif_ecdsa_get_modulus(_Curve) ->
 	?NOT_LOADED.
 nif_ecdsa_point_addition(_Curve, _Point1, _Point2) ->
+	?NOT_LOADED.
+nif_ecdsa_decode_point(_Curve, _Point) ->
 	?NOT_LOADED.
 
 nif_ecdsa_sign(_Curve, _PrivateKey, _Message) ->

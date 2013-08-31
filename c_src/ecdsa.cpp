@@ -255,6 +255,52 @@ ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
 	return enif_make_tuple(env, 2, outX, outY);
 }
 
+//decode a compressed point and return the X, Y coordinates as a tuple of {X,Y}
+//param1 - curve/atom, param2 - point/binary
+//Return - a tuple of {X/binary, Y/binary}.
+ERL_NIF_TERM ecdsa_decode_point(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+	char ec_curve[32];
+	ErlNifBinary point;
+
+	//out binaries
+	ERL_NIF_TERM outX;
+	ERL_NIF_TERM outY;
+
+	memset(ec_curve, 0x00, sizeof(ec_curve));
+
+	//param1 - curve name
+	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
+		return enif_make_badarg(env);
+	}
+
+	//param2 - compressed point/binary
+	if (!enif_inspect_binary(env, argv[1], &point)) {
+		return enif_make_badarg(env);
+	}	
+
+	//get the domain parameters
+	DL_GroupParameters_EC<ECP> params = getECCurve(ec_curve);
+	const Integer& n = params.GetCurve().GetField().GetModulus();
+	const Integer& a = params.GetCurve().GetA();
+	const Integer& b = params.GetCurve().GetB();
+
+	ECP decoder(n, a, b);
+	ECP::Point newPnt;
+	if (decoder.DecodePoint(newPnt, (const byte*)point.data, point.size)) {
+		//now marshall the points back to binaries
+		byte* outXbuffer = (byte*)enif_make_new_binary(env, newPnt.x.ByteCount(), &outX);
+		newPnt.x.Encode(outXbuffer, newPnt.x.ByteCount());
+
+		byte* outYbuffer = (byte*)enif_make_new_binary(env, newPnt.y.ByteCount(), &outY);
+		newPnt.y.Encode(outYbuffer, newPnt.y.ByteCount());
+
+		//return the decoded point
+		return enif_make_tuple(env, 2, outX, outY);
+	}
+	return enif_make_tuple(env, 2, enif_make_atom(env, "error\0"), enif_make_atom(env, "invalid_point\0")); 
+
+}
+
 // Sign a message with an ECDSA private key - the message is a binary string
 // Param1 - curve/atom, Param 2 - Private Key/binary, Param 3 - Message/binary
 // Return Signature/binary - this signature is in IEEE P1363 format, this is a
@@ -309,7 +355,6 @@ ERL_NIF_TERM ecdsa_sign(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 // Param4 - Signature/binary
 // Return true/false
 ERL_NIF_TERM ecdsa_verify(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
-	ERL_NIF_TERM out;
 	int pubKeyArity;
 	const ERL_NIF_TERM* pubKey;
 

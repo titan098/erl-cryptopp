@@ -2,6 +2,7 @@ f().
 M = cryptopp:ecdsa_generate_private_key(secp256k1).
 P = cryptopp:ecdsa_generate_public_key(secp256k1, M).
 Pt = cryptopp:ecdsa_decode_public_key(P).
+Pc = cryptopp:ecdsa_compress_point(P).
 Sig = cryptopp:ecdsa_sign(secp256k1, M, <<1,2,3,4,5>>).
 SigDer = cryptopp:ecdsa_sign(secp256k1, M, <<1,2,3,4,5>>, der).
 
@@ -10,4 +11,7 @@ SigDer = cryptopp:ecdsa_sign(secp256k1, M, <<1,2,3,4,5>>, der).
 
 cryptopp:ecdsa_verify(secp256k1, Pt, <<1,2,3,4,5>>, Sig).
 cryptopp:ecdsa_verify(secp256k1, Pt, <<1,2,3,4,5>>, SigDer, der).
+
+Pt == cryptopp:ecdsa_decode_point(secp256k1, P).
+Pt == cryptopp:ecdsa_decode_point(secp256k1, Pc).
 
