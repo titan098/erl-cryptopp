@@ -1,0 +1,11 @@
+EccSignature DEFINITIONS IMPLICIT TAGS ::=
+
+BEGIN
+EXPORTS ECDSA-Sig-Value;
+
+ECDSA-Sig-Value ::= SEQUENCE
+{
+    r  INTEGER,
+    s  INTEGER
+}
+END

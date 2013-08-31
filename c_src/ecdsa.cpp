@@ -257,7 +257,8 @@ ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
 
 // Sign a message with an ECDSA private key - the message is a binary string
 // Param1 - curve/atom, Param 2 - Private Key/binary, Param 3 - Message/binary
-// Return Signature/binary
+// Return Signature/binary - this signature is in IEEE P1363 format, this is a
+// concatination of r and s
 ERL_NIF_TERM ecdsa_sign(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 	ERL_NIF_TERM out;
 	ErlNifBinary privKey;
