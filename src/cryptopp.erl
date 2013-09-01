@@ -12,7 +12,7 @@
 %ecdsa functions
 -export([ecdsa_generate_public_key/2, ecdsa_generate_private_key/1]).
 -export([ecdsa_get_modulus/1, ecdsa_point_addition/3, ecdsa_compress_point/1, ecdsa_decode_point/2]).
--export([ecdsa_sign/3, ecdsa_verify/4]).
+-export([ecdsa_sign/3, ecdsa_verify/4, ecdsa_verify/5]).
 
 -compile([export_all, debug_info]).
 
