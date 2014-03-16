@@ -12,6 +12,7 @@
 %ecdsa functions
 -export([ecdsa_generate_public_key/2, ecdsa_generate_private_key/1]).
 -export([ecdsa_get_modulus/1, ecdsa_point_addition/3, ecdsa_compress_point/1, ecdsa_decode_point/2]).
+-export([ecdsa_get_base_point/1]).
 -export([ecdsa_sign/3, ecdsa_verify/4, ecdsa_verify/5]).
 
 -compile([export_all, debug_info]).
@@ -159,6 +160,13 @@ ecdsa_get_modulus(Curve) when is_atom(Curve) ->
 ecdsa_point_addition(Curve, Point1, Point2) ->
 	nif_ecdsa_point_addition(Curve, Point1, Point2).
 
+% Create a point on the specified curve through point multiplication with the base point
+ecdsa_get_base_point(Curve) ->
+	nif_ecdsa_get_base_point(Curve).
+
+ecdsa_point_multiplication(Curve, Integer, Point) ->
+	nif_ecdsa_point_multiplication(Curve, Integer, Point).
+
 %Decode a uncompressed key so that it is in point form to be sent to the
 % verification functions.
 ecdsa_decode_public_key(UncompressedKey) when is_binary(UncompressedKey) ->
@@ -286,7 +294,11 @@ nif_ecdsa_get_modulus(_Curve) ->
 	?NOT_LOADED.
 nif_ecdsa_point_addition(_Curve, _Point1, _Point2) ->
 	?NOT_LOADED.
+nif_ecdsa_point_multiplication(_Curve, _Integer, _Point) ->
+	?NOT_LOADED.
 nif_ecdsa_decode_point(_Curve, _Point) ->
+	?NOT_LOADED.
+nif_ecdsa_get_base_point(_Curve) ->
 	?NOT_LOADED.
 
 nif_ecdsa_sign(_Curve, _PrivateKey, _Message) ->

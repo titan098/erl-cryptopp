@@ -188,6 +188,32 @@ ERL_NIF_TERM ecdsa_get_modulus(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
 	return out;
 }
 
+ERL_NIF_TERM ecdsa_get_base_point(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+	char ec_curve[32];
+
+	//out binaries
+	ERL_NIF_TERM outX;
+	ERL_NIF_TERM outY;
+
+	//get the curve name
+	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
+		return enif_make_badarg(env);
+	}
+
+	//get the base point and return to the user
+	DL_GroupParameters_EC<ECP> params = getECCurve(ec_curve);
+	const ECP::Point& basePoint = params.GetSubgroupGenerator();
+	
+	//now marshall the points back to binaries
+	byte* outXbuffer = (byte*)enif_make_new_binary(env, basePoint.x.ByteCount(), &outX);
+	basePoint.x.Encode(outXbuffer, basePoint.x.ByteCount());
+
+	byte* outYbuffer = (byte*)enif_make_new_binary(env, basePoint.y.ByteCount(), &outY);
+	basePoint.y.Encode(outYbuffer, basePoint.y.ByteCount());
+
+	return enif_make_tuple(env, 2, outX, outY);
+}
+
 ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
 	//add points together in the finite field
 	char ec_curve[32];
@@ -224,13 +250,13 @@ ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
 
 	for (int i = 0; i < arity1; i++) {
 		enif_inspect_binary(env, point1[i], &(p1[i]));
-		enif_inspect_binary(env, point1[i], &(p2[i]));
+		enif_inspect_binary(env, point2[i], &(p2[i]));
 	}
 	
 	Integer x1(p1[0].data, p1[0].size);
-	Integer y1(p1[0].data, p1[0].size);
-	Integer x2(p1[1].data, p1[1].size);
-	Integer y2(p1[1].data, p1[1].size);
+	Integer y1(p1[1].data, p1[1].size);
+	Integer x2(p2[0].data, p2[0].size);
+	Integer y2(p2[1].data, p2[1].size);
 
 	ECP::Point pnt1(x1, y1);
 	ECP::Point pnt2(x2, y2);
@@ -244,6 +270,68 @@ ERL_NIF_TERM ecdsa_point_addition(ErlNifEnv* env, int argc, const ERL_NIF_TERM a
 	//add the points together in the field
 	ECP pointAdder(n, a, b);
 	const ECP::Point& newPnt = pointAdder.Add(pnt1, pnt2);
+
+	//now marshall the points back to binaries
+	byte* outXbuffer = (byte*)enif_make_new_binary(env, newPnt.x.ByteCount(), &outX);
+	newPnt.x.Encode(outXbuffer, newPnt.x.ByteCount());
+
+	byte* outYbuffer = (byte*)enif_make_new_binary(env, newPnt.y.ByteCount(), &outY);
+	newPnt.y.Encode(outYbuffer, newPnt.y.ByteCount());
+
+	return enif_make_tuple(env, 2, outX, outY);
+}
+
+ERL_NIF_TERM ecdsa_point_multiplication(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+	//add points together in the finite field
+	char ec_curve[32];
+	ErlNifBinary inInteger;
+	int pointArity;
+	const ERL_NIF_TERM* point;
+
+	//out binaries
+	ERL_NIF_TERM outX;
+	ERL_NIF_TERM outY;
+
+	memset(ec_curve, 0x00, sizeof(ec_curve));
+
+	//param1 - curve name
+	if (!enif_get_atom(env, argv[0], ec_curve, sizeof(ec_curve), ERL_NIF_LATIN1)) {
+		return enif_make_badarg(env);
+	}
+
+	//Integer - The input Integer
+	if (!enif_inspect_binary(env, argv[1], &inInteger)) {
+		return enif_make_badarg(env);
+	}
+
+	//Point - The point to multiply by
+	if (!enif_get_tuple(env, argv[2], &pointArity, &point)) {
+		return enif_make_badarg(env);
+	}
+	
+	Integer intMul(inInteger.data, inInteger.size);
+
+	//read each of the points as binarys these will then be converted to an integer
+	// the input point should be a tuple of the form {x,y} where x and y are binarys
+	ErlNifBinary p[pointArity];
+	for (int i = 0; i < pointArity; i++) {
+		enif_inspect_binary(env, point[i], &(p[i]));
+	}
+	Integer x(p[0].data, p[0].size);
+	Integer y(p[1].data, p[1].size);
+
+	//create the ECPoint
+	ECP::Point curvePoint(x, y);
+
+	//get the domain parameters
+	DL_GroupParameters_EC<ECP> params = getECCurve(ec_curve);
+	const Integer& n = params.GetCurve().GetField().GetModulus();
+	const Integer& a = params.GetCurve().GetA();
+	const Integer& b = params.GetCurve().GetB();
+
+	//add the points together in the field
+	ECP pointMul(n, a, b);
+	const ECP::Point& newPnt = pointMul.Multiply(intMul, curvePoint);
 
 	//now marshall the points back to binaries
 	byte* outXbuffer = (byte*)enif_make_new_binary(env, newPnt.x.ByteCount(), &outX);
