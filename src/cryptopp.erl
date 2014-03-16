@@ -178,13 +178,15 @@ ecdsa_encode_public_key({X, Y}) ->
 	<<4, X/binary, Y/binary>>.
 
 %%Encode the point as in compressed SEC form
-ecdsa_compress_point(UncompressedPoint) when is_binary(UncompressedPoint) ->
-	{X, Y} = ecdsa_decode_public_key(UncompressedPoint),
+ecdsa_compress_point({X,Y}) ->
 	Parity = case (binary:decode_unsigned(Y) rem 2) of
 			0 -> 2;
 			1 -> 3
 		 end,
-	<<Parity, X/binary>>.
+	<<Parity, X/binary>>;	
+ecdsa_compress_point(UncompressedPoint) when is_binary(UncompressedPoint) ->
+	{X, Y} = ecdsa_decode_public_key(UncompressedPoint),
+	ecdsa_compress_point({X,Y}).
 
 %%Decode a point that is in compressed SEC form
 ecdsa_decode_point(Curve, CompressedPoint) when is_binary(CompressedPoint) ->
